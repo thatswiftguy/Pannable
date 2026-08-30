@@ -57,6 +57,11 @@ final class HostRecycler<Content: View> {
                 active[position] = host
             }
         }
+
+        // Subviews accumulate in recycle order, which is arbitrary. Stating the
+        // accessibility order explicitly keeps VoiceOver reading items in the order the
+        // data declares them.
+        container.accessibilityElements = positions.compactMap { active[$0]?.view }
     }
 
     /// Rebuilds the root view of everything on screen.

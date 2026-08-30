@@ -44,13 +44,24 @@ public struct CanvasProxy {
     }
 
     /// Moves the viewport so this canvas-space point sits at `anchor`.
+    ///
+    /// ```swift
+    /// proxy.scrollTo(.zero, anchor: .topLeading)   // back to the canvas origin
+    /// ```
     public func scrollTo(_ point: CGPoint, anchor: UnitPoint = .center, animated: Bool = true) {
-        scrollTo(CGRect(origin: point, size: .zero), anchor: anchor, animated: animated)
+        scrollTo(region: CGRect(origin: point, size: .zero), anchor: anchor, animated: animated)
     }
 
-    /// Moves the viewport so this canvas-space rectangle sits at `anchor`.
-    public func scrollTo(_ rect: CGRect, anchor: UnitPoint = .center, animated: Bool = true) {
-        connection.host?.scrollTo(rect: rect, anchor: anchor, animated: animated)
+    /// Moves the viewport so this canvas-space region sits at `anchor`.
+    ///
+    /// Unlike the point form, the region's own size participates: at `.topLeading` its
+    /// top-left corner meets the viewport's, and at `.center` the whole region is
+    /// centred.
+    ///
+    /// The argument is labelled because an unlabelled `CGRect` overload would make
+    /// `scrollTo(.zero)` ambiguous at every call site.
+    public func scrollTo(region: CGRect, anchor: UnitPoint = .center, animated: Bool = true) {
+        connection.host?.scrollTo(rect: region, anchor: anchor, animated: animated)
     }
 }
 

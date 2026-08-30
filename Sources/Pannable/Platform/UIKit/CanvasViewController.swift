@@ -8,7 +8,7 @@ import UIKit
 @MainActor
 final class CanvasViewController<Content: View>: UIViewController, CanvasHostControlling {
 
-    let scrollView = UIScrollView()
+    let scrollView = CanvasScrollView()
     let contentView = UIView()
 
     private let engine: CanvasEngine<Content>

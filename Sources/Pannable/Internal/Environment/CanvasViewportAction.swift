@@ -22,6 +22,28 @@ extension EnvironmentValues {
     }
 }
 
+/// Composes viewport observers instead of replacing them.
+///
+/// Environment values normally overwrite, which would mean a canvas could report to
+/// only one observer — a binding *or* a callback, never both. Chaining onto whatever is
+/// already in scope lets several observers coexist, each seeing every change.
+private struct CanvasViewportActionModifier: ViewModifier {
+
+    @Environment(\.canvasViewportAction) private var existing
+
+    var action: (CanvasViewport) -> Void
+
+    func body(content: Content) -> some View {
+        content.environment(
+            \.canvasViewportAction,
+            CanvasViewportAction { [existing, action] viewport in
+                existing?.handler(viewport)
+                action(viewport)
+            }
+        )
+    }
+}
+
 extension View {
 
     /// Reports the canvas's viewport into a binding as it pans.
@@ -34,13 +56,16 @@ extension View {
     /// ```
     ///
     /// The binding is written on every frame of a pan, so keep the views that depend on
-    /// it small.
+    /// it small. Several observers can watch the same canvas; they compose rather than
+    /// replacing one another.
     public func canvasViewport(_ viewport: Binding<CanvasViewport>) -> some View {
-        environment(\.canvasViewportAction, CanvasViewportAction { viewport.wrappedValue = $0 })
+        modifier(CanvasViewportActionModifier { viewport.wrappedValue = $0 })
     }
 
     /// Calls `action` whenever the canvas's viewport changes.
+    ///
+    /// Composes with any other viewport observer already in scope.
     public func onCanvasViewportChange(_ action: @escaping (CanvasViewport) -> Void) -> some View {
-        environment(\.canvasViewportAction, CanvasViewportAction(handler: action))
+        modifier(CanvasViewportActionModifier(action: action))
     }
 }
