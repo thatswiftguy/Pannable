@@ -1,7 +1,6 @@
 # Pannable
 
-A pannable 2D canvas for SwiftUI. Hand it a collection and it arranges the items on a
-canvas of any size, building only the ones the viewport can actually see.
+A pannable 2D canvas for SwiftUI. Give it a collection — it lays items out on a big canvas and only builds what's on screen.
 
 ![iOS 16+](https://img.shields.io/badge/iOS-16.0+-1575F9)
 ![iPadOS 16+](https://img.shields.io/badge/iPadOS-16.0+-1575F9)
@@ -16,27 +15,23 @@ canvas of any size, building only the ones the viewport can actually see.
 
 ## Usage
 
-### The basics
-
-Give it a collection and a canvas size. `canvasContentAnchor` decides where the items
-cluster, `canvasInitialAnchor` where the viewport opens.
+### Basics
 
 ```swift
 PannableCanvas(stickers, contentSize: .fixed(width: 4000, height: 3000)) { sticker in
     StickerCard(sticker: sticker)
 }
 .canvasLayout(.flow(horizontalSpacing: 24, verticalSpacing: 24))
-.canvasContentAnchor(.center)
-.canvasInitialAnchor(.center)
+.canvasContentAnchor(.center)   // where items sit on the canvas
+.canvasInitialAnchor(.center)   // where the viewport opens
 ```
 
-Items are identified the way `ForEach` identifies them — `Identifiable`, an `id` key
-path, or a constant range.
+### IDs — same as `ForEach`
 
 ```swift
-PannableCanvas(photos, id: \.assetID) { PhotoTile(photo: $0) }
-
-PannableCanvas(0..<2_000) { Text("\($0)").frame(width: 80, height: 80) }
+PannableCanvas(stickers) { ... }                 // Identifiable
+PannableCanvas(photos, id: \.assetID) { ... }    // key path
+PannableCanvas(0..<2_000) { ... }                // range
 ```
 
 ### Layouts
@@ -46,32 +41,32 @@ PannableCanvas(0..<2_000) { Text("\($0)").frame(width: 80, height: 80) }
 .canvasLayout(.grid(columns: 8, horizontalSpacing: 12, verticalSpacing: 12))
 ```
 
-### Spacing and margins
+### Margins
 
 ```swift
 .canvasContentMargins(48)
 .canvasContentMargins(EdgeInsets(top: 40, leading: 24, bottom: 40, trailing: 24))
 ```
 
-### Item sizes
+### Item size
 
-Items measure themselves by default. If they are all the same size, say so — it skips
-measurement entirely.
+Items self-measure. All the same size? Say so — skips measuring entirely.
 
 ```swift
 .canvasItemSize(CGSize(width: 160, height: 160))
+.canvasEstimatedItemSize(CGSize(width: 120, height: 90))   // otherwise
 ```
 
-### A backdrop
+### Backdrop
 
 ```swift
 .canvasBackground(.dots(spacing: 24))
 .canvasBackground(.grid(spacing: 40, color: .blue.opacity(0.25)))
 ```
 
-### Moving the viewport in code
+### Scroll to something
 
-`CanvasReader` and `CanvasProxy` work like `ScrollViewReader` and `ScrollViewProxy`.
+Works like `ScrollViewReader`.
 
 ```swift
 CanvasReader { proxy in
@@ -83,16 +78,13 @@ CanvasReader { proxy in
 }
 ```
 
-### Watching the viewport
+### Track the viewport
 
 ```swift
 @State private var viewport = CanvasViewport()
 
 PannableCanvas(nodes) { NodeCard(node: $0) }
-    .canvasViewport($viewport)
-    .overlay(alignment: .bottomTrailing) {
-        MiniMap(visible: viewport.visibleRect, total: viewport.contentSize)
-    }
+    .canvasViewport($viewport)   // .visibleRect, .contentSize, .isMoving
 ```
 
 ### Behavior
@@ -104,10 +96,9 @@ PannableCanvas(nodes) { NodeCard(node: $0) }
 .canvasDeceleration(.fast)
 ```
 
-### A custom layout
+### Custom layout
 
-`CanvasLayout` is shaped after SwiftUI's `Layout`. Place items wherever is natural —
-negative coordinates included — and the canvas normalizes and anchors the result.
+Like SwiftUI's `Layout`, but on sizes. Place items anywhere — negative coords are fine, the canvas normalizes and anchors.
 
 ```swift
 struct RingCanvasLayout: CanvasLayout {
@@ -138,83 +129,48 @@ extension CanvasLayout where Self == RingCanvasLayout {
 
 ## How it works
 
-### The core is pure Swift
+- **Core is pure Swift.** Sizes in, frames out. No UIKit, AppKit or SwiftUI. Testable without a simulator.
+- **Layouts take sizes, not views.** That's why 10k items don't mean 10k views — it knows where everything goes before anything exists.
+- **Layouts don't know the canvas exists.** They emit a cluster at origin; the engine normalizes it, mirrors it for RTL, resolves content size, anchors it. Every layout gets RTL and anchoring for free.
+- **Culling.** Frames go into a uniform grid index. "What's in this rect?" costs visible-area time, not data-size time. Every pan runs it; results go to a pool of recycled hosting controllers.
+- **Scroll callbacks do nothing else.** No measuring, no allocating, no re-layout — that waits until the canvas stops. Keeps flings smooth.
 
-Placement, anchoring, content sizing, and visibility culling contain no view machinery
-at all — sizes go in, frames come out. The platform hosts sit on top and stay thin,
-which is what keeps their behavior from drifting apart and what lets the hard parts be
-tested without a simulator.
-
-Layouts work on **sizes**, not on live subviews. That is the whole reason a canvas can
-position ten thousand items without building ten thousand views: it knows where
-everything goes before anything exists.
-
-A layout emits a cluster at the origin and knows nothing about the canvas. The engine
-then normalizes that cluster, mirrors it for right-to-left, resolves the content size,
-and anchors it — so every layout gets RTL and anchoring correctly without handling
-either itself.
-
-### Only what you can see is built
-
-Frames are bucketed into a uniform grid, so asking "what is inside this rectangle?"
-costs time proportional to the visible area rather than to the data size. Every pan
-event runs that query and hands the result to a recycling pool of hosting controllers.
-
-Scroll callbacks do nothing else — no measurement, no allocation, no re-layout. Those
-are deferred to the moments the canvas is at rest, which is what keeps a fling smooth.
-
-### The platform hosts
+### Platform hosts
 
 | Platform | Built on |
 |---|---|
-| iOS / iPadOS | `UIScrollView` via a view controller representable, since every item is a `UIHostingController` and those need a parent to be contained by. `UIScrollViewDelegate` drives culling; `UIGestureRecognizerDelegate` adds pointer drag-to-pan, which a scroll view does not do on its own. |
-| macOS | `NSScrollView` over a flipped document view. Clip-view bounds changes and the live-scroll notifications stand in for the scroll delegate callbacks. |
-| watchOS | Neither type exists there, so it is pure SwiftUI driven by a drag gesture and the Digital Crown — over the same engine and the same culling. |
+| iOS / iPadOS | `UIScrollView`, via a **view controller** representable — items are `UIHostingController`s and need a parent. `UIScrollViewDelegate` drives culling. `UIGestureRecognizerDelegate` adds pointer drag-to-pan, which scroll views don't do. |
+| macOS | `NSScrollView` + flipped document view. Clip-view bounds changes and live-scroll notifications replace the scroll delegate. |
+| watchOS | Neither type exists. Pure SwiftUI — drag gesture + Digital Crown. Same engine, same culling. |
 
-### Measuring items
+### Measuring
 
-| You set | What happens |
+| Set | Result |
 |---|---|
-| `canvasItemSize(_:)` | Every item takes that size. Nothing is measured. |
-| `canvasEstimatedItemSize(_:)` | Unmeasured items use this while real sizes are computed, then the layout settles once. |
-| Neither | Items are measured against a default estimate. Fine for hundreds; set an estimate for thousands. |
+| `canvasItemSize` | Fixed size, nothing measured. |
+| `canvasEstimatedItemSize` | Placeholder while measuring, then one reflow. |
+| Neither | Default estimate. Fine for hundreds; set one for thousands. |
 
-Measurement happens off screen in chunks between run-loop turns, so a canvas over
-thousands of items still shows something on the first frame. Sizes are cached by item
-identity, so they survive reordering and insertion — only genuinely new items are
-measured again.
+Measured off-screen in chunks between run-loop turns, so the first frame isn't blocked. Cached by item ID — survives reorder and insert, only new items get measured.
 
-### The backdrop
+### Backdrop
 
-Drawn as a tiling pattern anchored to the canvas origin rather than into the content
-view, because a content view large enough to hold the whole canvas would need a backing
-store to match — at 6000×6000 on a 3× display, over a gigabyte. Tiling one small image
-costs nothing to pan and nothing in memory whatever the canvas size.
+Tiled pattern, not drawn into the content view. A 6000×6000 content view at 3× would need over a gigabyte of backing store. Tiling one small image costs nothing.
 
 ### Accessibility
 
-Because off-screen items are not in the view hierarchy, VoiceOver cannot swipe to them —
-the same situation a table view is in. The three-finger scroll gesture pages the canvas
-in all four directions, keeping a sliver of the previous screen so the user keeps their
-bearings. Hosted views also state their accessibility order explicitly, since subviews
-otherwise accumulate in recycle order rather than data order.
+Off-screen items aren't in the view hierarchy, so VoiceOver can't swipe to them — same as a table view. Three-finger scroll pages in all four directions. Hosted views declare their accessibility order, since subviews otherwise land in recycle order instead of data order.
 
-## Platform notes
+## Gotchas
 
-- **watchOS** cannot measure a SwiftUI view off screen, so items there always take their
-  size from `canvasItemSize(_:)` when set and `canvasEstimatedItemSize(_:)` otherwise.
-- **macOS** bounce follows the system scroll elasticity; `canvasBounce(.never)` disables
-  it, but `.always` behaves as `.automatic`.
-- The backdrop is a rendered bitmap, so it is redrawn when the appearance changes rather
-  than adapting on its own.
-- Watching the viewport writes state on every frame of a pan, so keep whatever depends
-  on it small. Multiple observers compose rather than replacing one another.
+- **watchOS** can't measure views off-screen. Set `canvasItemSize` or `canvasEstimatedItemSize` if your items differ in size.
+- **macOS** bounce follows system elasticity. `.never` works; `.always` behaves as `.automatic`.
+- **Backdrop** is a bitmap — redrawn on appearance change, doesn't adapt on its own.
+- **Viewport tracking** writes state every frame of a pan. Keep dependents small. Multiple observers compose.
 
-## Not yet implemented
+## Not done yet
 
-Zoom is the notable gap — the coordinate math and scroll-delegate hooks are in place for
-it, so it can arrive without an API break. Selection and drag-to-move, scroll snapping,
-per-item explicit coordinates, and a freeform canvas are also still open.
+Zoom — math and delegate hooks are already in place, so it won't break the API. Also: selection, drag-to-move, snapping, per-item coordinates, freeform canvas.
 
 ## Tests
 
@@ -222,6 +178,4 @@ per-item explicit coordinates, and a freeform canvas are also still open.
 swift test
 ```
 
-The layout engine, spatial index, sizing rules, backdrop geometry, and the update-loop
-guard are all covered without a simulator, including randomized parity between the index
-and a brute-force scan.
+Layout engine, spatial index, sizing, backdrop geometry, update-loop guard. No simulator needed. Includes randomized parity against a brute-force scan.
