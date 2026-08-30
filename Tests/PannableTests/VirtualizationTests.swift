@@ -154,6 +154,7 @@ extension CanvasConfiguration {
             isScrollDisabled: false,
             deceleration: .normal,
             overscan: 0,
+            background: .none,
             layoutDirection: .leftToRight
         )
     }

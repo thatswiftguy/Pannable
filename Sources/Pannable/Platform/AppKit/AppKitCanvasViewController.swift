@@ -156,6 +156,13 @@ final class CanvasViewController<Content: View>: NSViewController, CanvasHostCon
         // behaviors map directly.
         scrollView.verticalScrollElasticity = configuration.bounce == .never ? .none : .automatic
         scrollView.horizontalScrollElasticity = configuration.bounce == .never ? .none : .automatic
+
+        applyBackground()
+    }
+
+    private func applyBackground() {
+        // The content view redraws the pattern itself when the appearance changes.
+        contentView.background = engine.configuration.background
     }
 
     private func applyInitialAnchor() {

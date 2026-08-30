@@ -9,7 +9,39 @@ import SwiftUI
 /// coordinates mean the same thing on every platform, so the shared layout engine's
 /// output can be used verbatim rather than being mirrored on macOS alone.
 final class FlippedCanvasContentView: NSView {
+
     override var isFlipped: Bool { true }
+
+    /// The repeating backdrop drawn behind the items.
+    var background: CanvasBackground = .none {
+        didSet {
+            guard background != oldValue else { return }
+            refreshPattern()
+        }
+    }
+
+    private var patternColor: NSColor?
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        // The backdrop is a rendered bitmap, so it must be redrawn for the new
+        // appearance; a dynamic colour cannot adapt once baked into a pattern.
+        refreshPattern()
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let patternColor, let context = NSGraphicsContext.current else { return }
+        // Anchor the tiling to this view's own origin rather than the window's, so the
+        // pattern stays fixed to canvas coordinates as the canvas is panned.
+        context.patternPhase = convert(NSPoint.zero, to: nil)
+        patternColor.setFill()
+        dirtyRect.fill()
+    }
+
+    private func refreshPattern() {
+        patternColor = background.patternColor(for: effectiveAppearance)
+        needsDisplay = true
+    }
 }
 
 /// Measures item views without putting them on screen.

@@ -55,6 +55,7 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
     @Environment(\.canvasScrollDisabled) private var isScrollDisabled
     @Environment(\.canvasDeceleration) private var deceleration
     @Environment(\.canvasOverscan) private var overscan
+    @Environment(\.canvasBackground) private var background
     @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.canvasConnection) private var connection
     @Environment(\.canvasViewportAction) private var viewportAction
@@ -122,6 +123,7 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
             isScrollDisabled: isScrollDisabled,
             deceleration: deceleration,
             overscan: overscan,
+            background: background,
             layoutDirection: layoutDirection
         )
     }

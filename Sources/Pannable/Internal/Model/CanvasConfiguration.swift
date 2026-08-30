@@ -19,6 +19,7 @@ struct CanvasConfiguration: Equatable {
     var isScrollDisabled: Bool
     var deceleration: CanvasDecelerationRate
     var overscan: CGFloat
+    var background: CanvasBackground
     var layoutDirection: LayoutDirection
 
     /// Whether a change from `other` invalidates the resolved frames, as opposed to
@@ -50,6 +51,7 @@ extension EnvironmentValues {
             isScrollDisabled: canvasScrollDisabled,
             deceleration: canvasDeceleration,
             overscan: canvasOverscan,
+            background: canvasBackground,
             layoutDirection: layoutDirection
         )
     }

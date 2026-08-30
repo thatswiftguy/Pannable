@@ -91,6 +91,21 @@ PannableCanvas(0..<2_000) { index in
 .canvasItemSize(CGSize(width: 80, height: 80))
 ```
 
+### A backdrop
+
+A repeating pattern anchored to the canvas origin, which is what makes a canvas read as
+a canvas rather than as a scroll view — it gives the eye something fixed to judge
+movement against. It is drawn as a tiled pattern, so it costs nothing to pan and nothing
+in memory however large the canvas is.
+
+```swift
+PannableCanvas(nodes) { NodeCard(node: $0) }
+    .canvasBackground(.dots(spacing: 24))
+
+PannableCanvas(nodes) { NodeCard(node: $0) }
+    .canvasBackground(.grid(spacing: 40, color: .blue.opacity(0.25)))
+```
+
 ### Moving the viewport in code
 
 `CanvasReader` and `CanvasProxy` pair up exactly like `ScrollViewReader` and
@@ -201,6 +216,8 @@ The closer the estimate, the less the content shifts when measurements land.
   Set one of them if your items are not all the same size.
 - **macOS** bounce follows the system scroll elasticity; `canvasBounce(.never)` disables
   it, but `.always` behaves as `.automatic`.
+- The backdrop is a rendered bitmap, so it is redrawn when the appearance changes rather
+  than adapting on its own.
 - Right-to-left layouts mirror the cluster and flip both the content anchor and the
   leading margin, for every layout, without layouts having to handle it themselves.
 

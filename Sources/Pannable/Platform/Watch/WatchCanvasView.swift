@@ -31,6 +31,11 @@ struct WatchCanvasView<Content: View>: View {
                 Color.clear
                     .contentShape(Rectangle())
 
+                WatchCanvasBackgroundView(
+                    background: configuration.background,
+                    origin: controller.origin
+                )
+
                 ForEach(controller.visibleIndices(), id: \.self) { position in
                     if let frame = controller.frame(at: position), let content = controller.content(at: position) {
                         content

@@ -111,6 +111,13 @@ final class CanvasViewController<Content: View>: UIViewController, CanvasHostCon
             engine.invalidateMeasurements()
             resolveAndApplyLayout()
         }
+
+        // The backdrop is a rendered bitmap, so an appearance change has to redraw it;
+        // a dynamic colour cannot adapt on its own once it is baked into a pattern.
+        if previous?.userInterfaceStyle != traitCollection.userInterfaceStyle
+            || previous?.displayScale != traitCollection.displayScale {
+            applyBackground()
+        }
     }
 
     // MARK: - Updating from SwiftUI
@@ -190,6 +197,12 @@ final class CanvasViewController<Content: View>: UIViewController, CanvasHostCon
 
         scrollView.isScrollEnabled = !configuration.isScrollDisabled
         scrollView.decelerationRate = configuration.deceleration == .fast ? .fast : .normal
+
+        applyBackground()
+    }
+
+    private func applyBackground() {
+        contentView.backgroundColor = engine.configuration.background.patternColor(for: traitCollection)
     }
 
     private func applyInitialAnchor() {

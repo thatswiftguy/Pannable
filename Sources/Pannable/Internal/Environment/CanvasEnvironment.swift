@@ -45,6 +45,10 @@ private struct CanvasDecelerationKey: EnvironmentKey {
     static let defaultValue = CanvasDecelerationRate.normal
 }
 
+private struct CanvasBackgroundKey: EnvironmentKey {
+    static let defaultValue = CanvasBackground.none
+}
+
 private struct CanvasOverscanKey: EnvironmentKey {
     static let defaultValue: CGFloat = 128
 }
@@ -98,6 +102,11 @@ extension EnvironmentValues {
     var canvasDeceleration: CanvasDecelerationRate {
         get { self[CanvasDecelerationKey.self] }
         set { self[CanvasDecelerationKey.self] = newValue }
+    }
+
+    var canvasBackground: CanvasBackground {
+        get { self[CanvasBackgroundKey.self] }
+        set { self[CanvasBackgroundKey.self] = newValue }
     }
 
     var canvasOverscan: CGFloat {
