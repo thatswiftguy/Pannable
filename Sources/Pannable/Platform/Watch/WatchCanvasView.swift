@@ -57,11 +57,15 @@ struct WatchCanvasView<Content: View>: View {
             )
             .onAppear {
                 controller.viewportDidChange = viewportDidChange
+                // Claimed on appearance: SwiftUI can build more than one host for a
+                // given canvas, and only the visible one has a viewport worth reporting.
                 controller.connection = connection
+                controller.claimConnection()
                 controller.update(source: source, configuration: configuration)
                 controller.viewportSizeChanged(to: geometry.size)
                 crownPosition = controller.origin.y
             }
+            .onDisappear { controller.releaseConnection() }
             .canvasOnChange(of: geometry.size) { controller.viewportSizeChanged(to: $0) }
             .canvasOnChange(of: crownPosition) { position in
                 // Ignore the echo from a drag that just moved the crown's own binding.

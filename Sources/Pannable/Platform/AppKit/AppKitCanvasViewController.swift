@@ -18,10 +18,16 @@ final class CanvasViewController<Content: View>: NSViewController, CanvasHostCon
 
     var viewportDidChange: (CanvasViewport) -> Void = { _ in }
 
+    /// Claimed on appearance rather than on construction: SwiftUI can build more than
+    /// one host for a given canvas, and only the one actually on screen has a viewport
+    /// worth reporting.
     weak var connection: CanvasConnection? {
-        didSet { connection?.host = self }
+        didSet { if isOnScreen { connection?.host = self } }
     }
 
+    private var isOnScreen = false
+
+    private var viewportPublisher = ViewportPublisher()
     private var hasAppliedInitialAnchor = false
     private var isMeasurementScheduled = false
     private var isMoving = false
@@ -59,6 +65,19 @@ final class CanvasViewController<Content: View>: NSViewController, CanvasHostCon
         resolveAndApplyLayout()
     }
 
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        isOnScreen = true
+        connection?.host = self
+        publishViewport()
+    }
+
+    override func viewDidDisappear() {
+        super.viewDidDisappear()
+        isOnScreen = false
+        if connection?.host === self { connection?.host = nil }
+    }
+
     override func viewDidLayout() {
         super.viewDidLayout()
 
@@ -89,7 +108,6 @@ final class CanvasViewController<Content: View>: NSViewController, CanvasHostCon
             resolveAndApplyLayout()
         } else {
             recycler.refreshContent(engine.content(at:))
-            publishViewport()
         }
     }
 
@@ -217,8 +235,12 @@ final class CanvasViewController<Content: View>: NSViewController, CanvasHostCon
         scrollView.reflectScrolledClipView(clipView)
     }
 
+    /// Reports the viewport, but only when it actually changed.
+    ///
+    /// See ``ViewportPublisher`` for why the change check matters.
     func publishViewport() {
         let viewport = currentViewport
+        guard viewportPublisher.shouldPublish(viewport) else { return }
         viewportDidChange(viewport)
         connection?.viewport = viewport
     }

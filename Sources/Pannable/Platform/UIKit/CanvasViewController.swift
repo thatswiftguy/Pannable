@@ -20,10 +20,17 @@ final class CanvasViewController<Content: View>: UIViewController, CanvasHostCon
     var viewportDidChange: (CanvasViewport) -> Void = { _ in }
 
     /// The reader this canvas reports to, if it is inside one.
+    ///
+    /// Claimed on appearance rather than on construction: SwiftUI can build more than
+    /// one host for a given canvas, and only the one actually on screen has a viewport
+    /// worth reporting.
     weak var connection: CanvasConnection? {
-        didSet { connection?.host = self }
+        didSet { if isOnScreen { connection?.host = self } }
     }
 
+    private var isOnScreen = false
+
+    private var viewportPublisher = ViewportPublisher()
     private var hasAppliedInitialAnchor = false
     private var isMeasurementScheduled = false
     private var lastLaidOutBounds: CGRect = .zero
@@ -61,6 +68,21 @@ final class CanvasViewController<Content: View>: UIViewController, CanvasHostCon
 
         applyBehavior()
         resolveAndApplyLayout()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        isOnScreen = true
+        connection?.host = self
+        publishViewport()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        isOnScreen = false
+        // Only surrender the connection if this host still holds it; a newly appeared
+        // host may already have taken over.
+        if connection?.host === self { connection?.host = nil }
     }
 
     override func viewDidLayoutSubviews() {
@@ -106,7 +128,6 @@ final class CanvasViewController<Content: View>: UIViewController, CanvasHostCon
         } else {
             // Identities held but the views behind them may not have.
             recycler.refreshContent(engine.content(at:))
-            publishViewport()
         }
     }
 
@@ -253,8 +274,12 @@ final class CanvasViewController<Content: View>: UIViewController, CanvasHostCon
         )
     }
 
+    /// Reports the viewport, but only when it actually changed.
+    ///
+    /// See ``ViewportPublisher`` for why the change check matters.
     func publishViewport() {
         let viewport = currentViewport
+        guard viewportPublisher.shouldPublish(viewport) else { return }
         viewportDidChange(viewport)
         connection?.viewport = viewport
     }

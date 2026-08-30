@@ -27,14 +27,23 @@ final class WatchCanvasController<Content: View>: ObservableObject, CanvasHostCo
     @Published var isDragging = false
 
     private var engine: CanvasEngine<Content>?
+    private var viewportPublisher = ViewportPublisher()
 
     /// The size of the area the canvas is drawn into.
     private(set) var viewportSize: CGSize = .zero
 
     var viewportDidChange: (CanvasViewport) -> Void = { _ in }
 
-    weak var connection: CanvasConnection? {
-        didSet { connection?.host = self }
+    weak var connection: CanvasConnection?
+
+    /// Takes over as the canvas the proxy talks to.
+    func claimConnection() {
+        connection?.host = self
+    }
+
+    /// Steps down, unless another host has already taken over.
+    func releaseConnection() {
+        if connection?.host === self { connection?.host = nil }
     }
 
     nonisolated init() {}
@@ -117,8 +126,12 @@ final class WatchCanvasController<Content: View>: ObservableObject, CanvasHostCo
         CGRect(origin: origin, size: viewportSize)
     }
 
+    /// Reports the viewport, but only when it actually changed.
+    ///
+    /// See ``ViewportPublisher`` for why the change check matters.
     func publishViewport() {
         let viewport = currentViewport
+        guard viewportPublisher.shouldPublish(viewport) else { return }
         viewportDidChange(viewport)
         connection?.viewport = viewport
     }
