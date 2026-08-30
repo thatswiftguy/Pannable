@@ -1,0 +1,117 @@
+#if os(macOS)
+
+import AppKit
+import SwiftUI
+
+/// A document view that uses top-left origin coordinates.
+///
+/// AppKit measures from the bottom-left by default. Flipping it means canvas
+/// coordinates mean the same thing on every platform, so the shared layout engine's
+/// output can be used verbatim rather than being mirrored on macOS alone.
+final class FlippedCanvasContentView: NSView {
+    override var isFlipped: Bool { true }
+}
+
+/// Measures item views without putting them on screen.
+///
+/// One hosting controller is reused for every measurement rather than one per item, and
+/// it is parented to the canvas's own controller so it inherits the same environment.
+@MainActor
+final class AppKitItemMeasurer<Content: View> {
+
+    private let controller = NSHostingController<Content?>(rootView: nil)
+
+    init(parent: NSViewController) {
+        parent.addChild(controller)
+        controller.view.frame = .zero
+        controller.view.isHidden = true
+        parent.view.addSubview(controller.view)
+    }
+
+    /// The size `content` wants, given the width the canvas can offer it.
+    func measure(_ content: Content, proposedWidth: CGFloat?) -> CGSize {
+        controller.rootView = content
+        defer { controller.rootView = nil }
+
+        let width = proposedWidth.map { $0 > 0 ? $0 : CGFloat.greatestFiniteMagnitude }
+            ?? CGFloat.greatestFiniteMagnitude
+        return controller.sizeThatFits(in: CGSize(width: width, height: .greatestFiniteMagnitude))
+    }
+}
+
+/// A pool of hosting controllers shared by whichever items are currently visible.
+///
+/// Pooled controllers stay children of the canvas's controller for their whole
+/// lifetime; only their views enter and leave the content view, so reuse costs a
+/// property assignment rather than view-controller containment.
+@MainActor
+final class AppKitHostRecycler<Content: View> {
+
+    private unowned let parent: NSViewController
+    private unowned let container: NSView
+
+    private var active: [Int: NSHostingController<Content?>] = [:]
+    private var pool: [NSHostingController<Content?>] = []
+
+    init(parent: NSViewController, container: NSView) {
+        self.parent = parent
+        self.container = container
+    }
+
+    var activeCount: Int { active.count }
+    var allocatedCount: Int { active.count + pool.count }
+
+    func setVisible(
+        _ positions: [Int],
+        content: (Int) -> Content,
+        frame: (Int) -> CGRect?
+    ) {
+        let wanted = Set(positions)
+
+        for position in active.keys where !wanted.contains(position) {
+            recycle(position)
+        }
+
+        for position in positions {
+            guard let frame = frame(position) else { continue }
+            if let host = active[position] {
+                if host.view.frame != frame { host.view.frame = frame }
+            } else {
+                let host = dequeue()
+                host.rootView = content(position)
+                host.view.frame = frame
+                container.addSubview(host.view)
+                active[position] = host
+            }
+        }
+    }
+
+    func refreshContent(_ content: (Int) -> Content) {
+        for (position, host) in active {
+            host.rootView = content(position)
+        }
+    }
+
+    func recycleAll() {
+        for position in active.keys {
+            recycle(position)
+        }
+    }
+
+    private func recycle(_ position: Int) {
+        guard let host = active.removeValue(forKey: position) else { return }
+        host.view.removeFromSuperview()
+        host.rootView = nil
+        pool.append(host)
+    }
+
+    private func dequeue() -> NSHostingController<Content?> {
+        if let reused = pool.popLast() { return reused }
+
+        let host = NSHostingController<Content?>(rootView: nil)
+        parent.addChild(host)
+        return host
+    }
+}
+
+#endif

@@ -30,7 +30,7 @@ import CoreGraphics
 ///     }
 /// }
 /// ```
-public protocol CanvasLayout: Sendable {
+public protocol CanvasLayout: Equatable, Sendable {
 
     /// Storage a layout can carry across placement passes.
     associatedtype Cache = Void
